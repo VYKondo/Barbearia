@@ -1,0 +1,362 @@
+'use client'
+
+export const dynamic = 'force-dynamic'
+import { useRouter, useParams } from 'next/navigation'
+import { useEffect, useState, useMemo, ChangeEvent, FormEvent } from 'react'
+import { supabase } from '@/lib/supabase'
+import { ArrowLeft, Save, Truck, Fuel, Package, Trash2, Plus, Wrench } from 'lucide-react'
+
+interface FreteData {
+  motorista: string;
+  placa: string;
+  data_frete: string;
+  peso_ton: string;
+  preco_ton: string;
+  odometro_atual: number;
+  [key: string]: any;
+}
+
+interface Abastecimento {
+  volume: string;
+  odometro: string;
+  valor: string;
+  completou: boolean;
+  media_kml?: number;
+}
+
+const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
+
+// Funções de formatação puras
+const formatCurrency = (value: any) => {
+  const num = typeof value === 'number' ? value : Number(String(value).replace(/\D/g, '')) / 100;
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num || 0);
+}
+
+const formatDecimal = (value: any, isWeight = false) => {
+  const divisor = isWeight ? 1000 : 100;
+  const num = typeof value === 'number' ? value : Number(String(value).replace(/\D/g, '')) / divisor;
+  return new Intl.NumberFormat('pt-BR', { 
+    minimumFractionDigits: isWeight ? 3 : 2, 
+    maximumFractionDigits: isWeight ? 3 : 2 
+  }).format(num || 0);
+}
+
+const formatOdometer = (value: any) => {
+  const num = typeof value === 'number' ? value : Number(String(value).replace(/\D/g, ''));
+  return new Intl.NumberFormat('pt-BR').format(num || 0);
+}
+
+const parseCurrency = (v: any) => Number(String(v).replace(/\D/g, '')) / 100;
+const parseNumero = (v: any) => parseFloat(String(v || '0').replace(/\./g, '').replace(',', '.')) || 0;
+const parseDecimalMask = (v: any, isWeight = false) => Number(String(v).replace(/\D/g, '')) / (isWeight ? 1000 : 100);
+const parseOdometer = (v: any) => Number(String(v || '0').replace(/\D/g, '')) || 0;
+
+export default function EditFretePage() {
+  const router = useRouter()
+  const params = useParams()
+  const id = params?.id
+
+  const [formValues, setFormValues] = useState<FreteData | null>(null)
+  const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [odometroAnterior, setOdometroAnterior] = useState(0)
+  const [tenantId, setTenantId] = useState<string | null>(null)
+
+  const camposOperacionais = [
+    'pedagio', 'mecanica', 'eletrica', 'borracharia', 'diferenca_frete', 'quebra', 
+    'patio', 'limpeza', 'lavagem', 'arla', 'cartao', 'diversos_operacional', 'caixinha'
+  ]
+
+  useEffect(() => {
+    async function fetchFrete() {
+      if (!id) return
+      
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+
+      const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', user.id).single()
+      if (!profile?.tenant_id) { router.push('/'); return }
+      setTenantId(profile.tenant_id)
+
+      const { data, error } = await supabase.from('fretes').select('*').eq('id', id).eq('tenant_id', profile.tenant_id).single()
+      if (error || !data) { router.push('/fretes'); return }
+      
+      const initialValues: FreteData = { 
+        ...data,
+        peso_ton: formatDecimal(data.peso_ton, true),
+        preco_ton: formatCurrency(data.preco_ton)
+      }
+
+      camposOperacionais.forEach(campo => { 
+        initialValues[campo] = formatCurrency(data[campo] || 0) 
+      })
+      
+      const absFormatados = (data.abastecimentos_json || []).map((a: any) => ({
+        ...a,
+        valor: formatCurrency(a.valor),
+        volume: formatDecimal(a.volume),
+        odometro: formatOdometer(a.odometro)
+      }))
+
+      setFormValues(initialValues)
+      setAbastecimentos(absFormatados)
+
+      const { data: anterior } = await supabase
+        .from('fretes').select('odometro_atual').eq('placa', data.placa)
+        .eq('tenant_id', profile.tenant_id)
+        .lt('created_at', data.created_at).order('created_at', { ascending: false })
+        .limit(1).maybeSingle()
+      
+      setOdometroAnterior(anterior?.odometro_atual || 0)
+      setLoading(false)
+    }
+    fetchFrete()
+  }, [id, router])
+
+  const abastecimentosComMedia = useMemo(() => {
+    let lastOdo = odometroAnterior;
+    let kmAcum = 0;
+    let litrosAcum = 0;
+
+    return abastecimentos.map((abs) => {
+      const vol = parseDecimalMask(abs.volume);
+      const odo = parseOdometer(abs.odometro);
+      const comp = abs.completou;
+
+      const isOdoValido = odo > lastOdo;
+      const difKm = isOdoValido ? (odo - lastOdo) : 0;
+      const kmTrecho = kmAcum + difKm;
+      const litrosTrecho = litrosAcum + vol;
+
+      let media = 0;
+      if (comp && litrosTrecho > 0 && isOdoValido) {
+        media = kmTrecho / litrosTrecho;
+        kmAcum = 0;
+        litrosAcum = 0;
+      } else {
+        if (isOdoValido) kmAcum = kmTrecho;
+        litrosAcum = litrosTrecho;
+      }
+
+      if (isOdoValido) lastOdo = odo;
+      return { ...abs, media_kml: media };
+    });
+  }, [abastecimentos, odometroAnterior]);
+
+  // CÁLCULOS PARA EXIBIÇÃO E SALVAMENTO
+  const stats = useMemo(() => {
+    if (!formValues) return { despesas: 0, lucro: 0, receitaBruta: 0 }
+    
+    // 1. Receita Bruta (Peso x Preço)
+    const receitaBruta = parseDecimalMask(formValues.peso_ton, true) * parseCurrency(formValues.preco_ton);
+    
+    // 2. Despesas (Diesel + Operacional + 11% da Receita Bruta)
+    const custoDiesel = abastecimentos.reduce((acc, curr) => acc + parseCurrency(curr.valor), 0);
+    const outrosCustos = camposOperacionais.reduce((acc, campo) => acc + parseCurrency(formValues[campo]), 0);
+    const taxaAdministrativa = receitaBruta * 0.11; // 11% em cima do frete bruto
+    
+    const totalDespesas = custoDiesel + outrosCustos + taxaAdministrativa;
+    
+    return { 
+      despesas: totalDespesas, 
+      receitaBruta: receitaBruta,
+      lucro: receitaBruta - totalDespesas 
+    }
+  }, [formValues, abastecimentos])
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!formValues || !tenantId) return
+    setSaving(true)
+    
+    const paradasProntas = abastecimentosComMedia.map(abs => ({
+      volume: round2(parseDecimalMask(abs.volume)),
+      odometro: parseOdometer(abs.odometro),
+      valor: parseCurrency(abs.valor),
+      completou: !!abs.completou,
+      media_kml: round2(abs.media_kml || 0)
+    }))
+
+    const ultimo = paradasProntas[paradasProntas.length - 1] || {}
+    
+    const dataToSave: any = {
+      ...formValues,
+      tenant_id: tenantId,
+      peso_ton: parseDecimalMask(formValues.peso_ton, true),
+      preco_ton: parseCurrency(formValues.preco_ton),
+      abastecimentos_json: paradasProntas,
+      
+      // Salvando a Receita Bruta integral
+      receita: round2(stats.receitaBruta),
+      // Salvando o total de despesas (que agora inclui os 11%)
+      valor: round2(stats.despesas),
+      
+      odometro_atual: ultimo.odometro || formValues.odometro_atual,
+      media_kml: round2(ultimo.media_kml || 0),
+    }
+
+    camposOperacionais.forEach(campo => { 
+      dataToSave[campo] = parseCurrency(formValues[campo]) 
+    })
+    
+    delete dataToSave.id
+    delete dataToSave.created_at
+    
+    const { error } = await supabase.from('fretes').update(dataToSave).eq('id', id).eq('tenant_id', tenantId)
+    if (!error) router.push('/fretes')
+    else { setSaving(false); alert(error.message) }
+  }
+
+  if (loading || !formValues) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-emerald-500 font-black animate-pulse">CARREGANDO...</div>
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-3 md:p-6 font-sans">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <header className="flex items-center justify-between bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-600 rounded-xl"><Truck size={24} className="text-white" /></div>
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-tight">Editar Operação</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ID: {id?.toString().slice(0,8)}</p>
+            </div>
+          </div>
+          <button type="button" onClick={() => router.back()} className="bg-slate-800 px-4 py-2 rounded-lg text-xs font-bold border border-slate-700 hover:bg-slate-700 transition-all flex items-center gap-2 text-slate-300">
+            <ArrowLeft size={14}/> VOLTAR
+          </button>
+        </header>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <section className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 shadow-xl">
+            <div className="bg-blue-700 px-6 py-3 flex justify-between items-center">
+              <h2 className="text-sm font-black uppercase flex items-center gap-2"><Package size={18} /> Dados da Viagem</h2>
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+              <BigInput label="Motorista" value={formValues.motorista} onChange={(e: any) => setFormValues({...formValues, motorista: e.target.value})} placeholder="NOME DO MOTORISTA" required />
+              <BigInput label="Placa" value={formValues.placa} onChange={(e: any) => setFormValues({...formValues, placa: e.target.value.toUpperCase()})} placeholder="AAA-0000" required />
+              <BigInput label="Data" type="date" value={formValues.data_frete} onChange={(e: any) => setFormValues({...formValues, data_frete: e.target.value})} required />
+              <div className="grid grid-cols-2 gap-4">
+                <BigInput label="Peso (Ton)" name="peso_ton" value={formValues.peso_ton} onChange={(e: any) => setFormValues({...formValues, peso_ton: e.target.value})} isDecimal />
+                <BigInput label="Valor/Ton" value={formValues.preco_ton} onChange={(e: any) => setFormValues({...formValues, preco_ton: e.target.value})} isCurrency />
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 shadow-xl">
+            <div className="bg-emerald-700 px-6 py-3 flex justify-between items-center">
+              <h2 className="text-sm font-black uppercase flex items-center gap-2"><Fuel size={18} /> Abastecimento</h2>
+              <button type="button" onClick={() => setAbastecimentos([...abastecimentos, { volume: '', odometro: '', valor: '', completou: false }])} className="bg-white text-emerald-700 px-3 py-1 rounded-lg text-[10px] font-black flex items-center gap-1"><Plus size={14} /> ADICIONAR</button>
+            </div>
+            <div className="p-4 space-y-4">
+              {abastecimentosComMedia.map((abs, index) => (
+                <div key={index} className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700 relative space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <BigInput label="Valor Pago" value={abs.valor} onChange={(e: any) => {
+                       const n = [...abastecimentos]; n[index].valor = e.target.value; setAbastecimentos(n);
+                    }} isCurrency />
+                    <BigInput label="Odômetro" value={abs.odometro} onChange={(e: any) => {
+                       const n = [...abastecimentos]; n[index].odometro = e.target.value; setAbastecimentos(n);
+                    }} placeholder="0" isOdometer />
+                    <BigInput label="Litros" value={abs.volume} onChange={(e: any) => {
+                       const n = [...abastecimentos]; n[index].volume = e.target.value; setAbastecimentos(n);
+                    }} isDecimal />
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <input type="checkbox" checked={abs.completou} onChange={(e: any) => {
+                        const n = [...abastecimentos]; n[index].completou = e.target.checked; setAbastecimentos(n);
+                      }} className="w-7 h-7 rounded-lg accent-emerald-500" />
+                      <span className="text-xs font-black uppercase text-slate-300">completou?</span>
+                    </label>
+                    <div className="text-right">
+                       <p className="text-[9px] font-black text-slate-500 uppercase">Média trecho</p>
+                       <p className={`text-2xl font-black ${abs.media_kml && abs.media_kml > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>{abs.media_kml && abs.media_kml > 0 ? abs.media_kml.toFixed(2) : '--'} <span className="text-xs">km/l</span></p>
+                    </div>
+                  </div>
+                  {index > 0 && (
+                    <button type="button" onClick={() => setAbastecimentos(abastecimentos.filter((_, i) => i !== index))} className="absolute -right-2 -top-2 bg-red-600 p-1.5 rounded-full shadow-lg border-2 border-slate-900 text-white"><Trash2 size={14} /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 shadow-xl p-6">
+              <h2 className="text-xs font-black uppercase text-slate-500 mb-6 flex items-center gap-2"><Wrench size={16} /> Operacional</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {camposOperacionais.map(campo => (
+                <div key={campo}>
+                    <BigInput 
+                      label={campo.replace('_', ' ')}
+                      value={formValues[campo]}
+                      onChange={(e: any) => setFormValues({...formValues, [campo]: e.target.value})}
+                      isCurrency
+                    />
+                </div>
+              ))}
+              </div>
+          </section>
+
+          <div className="pt-6">
+            <div className="bg-slate-900 p-4 rounded-3xl border-2 border-emerald-500 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-6 w-full md:w-auto justify-around md:justify-start text-white">
+                <div>
+                  <p className="text-[9px] font-black text-slate-500 uppercase">Gasto Total (Banco)</p>
+                  <p className="text-lg font-black text-red-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.despesas)}</p>
+                </div>
+                <div className="h-10 w-[1px] bg-slate-800 hidden md:block" />
+                <div>
+                  <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Lucro Líquido</p>
+                  <p className="text-3xl font-black">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.lucro)}</p>
+                </div>
+              </div>
+              <button type="submit" disabled={saving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 transition-all border-b-4 border-emerald-800">
+                {saving ? <div className="h-5 w-5 border-4 border-white/30 border-t-white rounded-full animate-spin" /> : <><Save size={20}/> SALVAR ALTERAÇÕES</>}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function BigInput({ label, badge, isCurrency, isDecimal, isOdometer, onChange, name, value, ...props }: any) {
+  
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    let rawValue = e.target.value;
+    
+    if (isCurrency || isDecimal || isOdometer) {
+      const numericValue = rawValue.replace(/\D/g, '');
+      if (!numericValue) {
+        e.target.value = '';
+      } else {
+        if (isOdometer) {
+          e.target.value = formatOdometer(numericValue);
+        } else {
+          const isWeight = name === 'peso_ton';
+          e.target.value = isCurrency 
+            ? formatCurrency(numericValue)
+            : formatDecimal(numericValue, isWeight);
+        }
+      }
+    }
+    if (onChange) onChange(e);
+  };
+
+  return (
+    <div className="flex flex-col gap-1 w-full">
+      <div className="flex justify-between items-center px-1">
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</label>
+        {badge}
+      </div>
+      <input 
+        {...props}
+        name={name}
+        value={value || ''}
+        onChange={handleInputChange}
+        className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-4 text-white font-bold outline-none focus:ring-2 ring-blue-500/50 transition-all placeholder:text-slate-600"
+      />
+    </div>
+  )
+}
