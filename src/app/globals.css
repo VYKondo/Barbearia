@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0a0a0a;
+  --color-secondary: #1a1a1a;
+  --color-accent: #c9a84c;
+  --color-accent-light: #e2c97e;
+  --color-accent-dark: #a68a3e;
+  --color-dark-brown: #2c1e10;
+  --color-cream: #f5f0e8;
+  --color-cream-dark: #e8dfd0;
+  --color-light: #fafafa;
+  --color-barber-red: #8b1a1a;
+  
+  --font-serif: "Playfair Display", serif;
+  --font-sans: "Lora", serif;
+  --font-display: "Cinzel", serif;
+
+  --animate-barber-slide: barber-slide 8s linear infinite;
+
+  @keyframes barber-slide {
+    from {
+      background-position: 0 0;
+    }
+    to {
+      background-position: 0 36px;
+    }
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-primary text-cream antialiased font-sans;
+  overflow-x: hidden;
+}
+
+/* Custom Utilities based on provided CSS */
+.font-cinzel {
+  font-family: var(--font-display);
+}
+
+.font-lora {
+  font-family: var(--font-sans);
+}
+
+/* ========== SCROLLBAR ========== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #a68a3e;
+  border-radius: 4px;
+}
