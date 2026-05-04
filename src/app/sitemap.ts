@@ -1,7 +1,7 @@
 import { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://barbeariaclassica-olive.vercel.app/"; // Alterar para o domínio real quando disponível
+  const baseUrl = "https://barbeariaclassica-olive.vercel.app"; // Removida a barra final para evitar duplicidade
 
   return [
     {
