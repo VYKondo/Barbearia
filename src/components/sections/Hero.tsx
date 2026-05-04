@@ -32,7 +32,7 @@ export default function Hero({ id }: HeroProps) {
             Desde 2015 — Tradição & Excelência
           </div>
           
-          <h1 className="font-display text-8xl md:text-[10rem] font-black text-accent tracking-[15px] leading-none mb-4 uppercase drop-shadow-[0_2px_20px_rgba(201,168,76,0.3)]">
+          <h1 className="font-display text-7xl sm:text-8xl md:text-[10rem] font-black text-accent tracking-[10px] sm:tracking-[15px] leading-none mb-4 uppercase drop-shadow-[0_2px_20px_rgba(201,168,76,0.3)]">
             JK
           </h1>
           
