@@ -29,9 +29,20 @@ export default function Header() {
   // Bloquear scroll quando o menu estiver aberto
   useEffect(() => {
     if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
+      const scrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      document.body.style.overflowY = "scroll"; // Keep scrollbar space
     } else {
-      document.body.style.overflow = "unset";
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflowY = "";
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
     }
   }, [mobileMenuOpen]);
 
@@ -44,7 +55,7 @@ export default function Header() {
       <nav className="px-6 py-4">
         <div className="container mx-auto flex items-center justify-between">
           {/* Logo */}
-          <Link href="#inicio" className="flex items-center gap-3 group relative z-50">
+          <Link href="#inicio" className="flex items-center gap-3 group relative z-70">
             <div className="w-12 h-12 border-2 border-accent rounded-full flex items-center justify-center font-display font-black text-accent text-xl transition-transform group-hover:scale-110">
               JK
             </div>
@@ -71,7 +82,7 @@ export default function Header() {
 
           {/* Mobile Toggle */}
           <button
-            className="md:hidden text-accent p-2 relative z-50 hover:bg-accent/10 rounded-full transition-colors"
+            className="md:hidden text-accent p-2 relative z-70 hover:bg-accent/10 rounded-full transition-colors"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
           >
@@ -88,12 +99,12 @@ export default function Header() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-0 bg-secondary z-40 md:hidden flex flex-col"
+            className="fixed inset-0 bg-secondary z-60 md:hidden flex flex-col h-[100dvh] backdrop-blur-none"
           >
             {/* Background Texture/Pattern */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[repeating-linear-gradient(45deg,transparent,transparent_20px,var(--color-accent)_20px,var(--color-accent)_21px)]" />
             
-            <div className="flex flex-col h-full pt-32 pb-12 px-10 relative z-10">
+            <div className="flex flex-col h-full pt-32 pb-12 px-10 relative z-10 overflow-y-auto overflow-x-hidden">
               <div className="flex flex-col gap-1 items-center mb-12">
                 <span className="font-display text-accent text-[10px] tracking-[5px] uppercase">Menu</span>
                 <div className="w-12 h-[1px] bg-accent/30 mt-2" />

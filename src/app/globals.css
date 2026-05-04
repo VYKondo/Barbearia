@@ -28,14 +28,18 @@
   }
 }
 
-html {
+html,
+body {
   scroll-behavior: smooth;
+  max-width: 100%;
   overflow-x: hidden;
+  position: relative;
+  touch-action: manipulation; /* Avoid accidental zoom on double tap */
 }
 
 body {
   @apply bg-primary text-cream antialiased font-sans;
-  overflow-x: hidden;
+  min-height: 100dvh;
 }
 
 /* Custom Utilities based on provided CSS */

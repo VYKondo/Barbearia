@@ -37,6 +37,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -48,8 +50,9 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${inter.variable} ${playfair.variable} ${lora.variable} ${cinzel.variable}`}>
       <body className="bg-primary text-cream antialiased">
         {/* Top Bar */}
-        <div className="bg-accent-dark text-primary text-center py-2 px-4 text-[13px] tracking-[2px] font-sans font-bold z-50 relative">
-          Agendamento pelo WhatsApp: (11) 99999-9999 &nbsp;•&nbsp; Seg–Sáb: 9h às 20h
+        <div className="bg-accent-dark text-primary text-center py-2 px-4 text-[10px] sm:text-[13px] tracking-[1px] sm:tracking-[2px] font-sans font-bold z-50 relative">
+          <span className="hidden xs:inline">Agendamento pelo WhatsApp: (11) 99999-9999 &nbsp;•&nbsp;</span>
+          <span> Seg–Sáb: 9h às 20h</span>
         </div>
         <BackgroundEffects />
         <Header />
