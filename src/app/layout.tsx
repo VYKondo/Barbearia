@@ -5,6 +5,8 @@ import Footer from "@/components/layout/Footer";
 import BackgroundEffects from "@/components/layout/BackgroundEffects";
 import "./globals.css";
 
+import JsonLd from "@/components/seo/JsonLd";
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -30,8 +32,44 @@ const cinzel = Cinzel({
 });
 
 export const metadata: Metadata = {
-  title: "Barbearia JK — Tradição & Estilo",
-  description: "Mais do que uma barbearia, um espaço onde tradição, estilo e excelência se encontram para oferecer a melhor experiência masculina.",
+  title: {
+    default: "Barbearia JK — Tradição & Estilo em São Paulo",
+    template: "%s | Barbearia JK"
+  },
+  description: "A melhor barbearia clássica de São Paulo. Cortes de cabelo, barba com toalha quente e serviços premium. Tradição e estilo desde 2015.",
+  keywords: ["barbearia", "barbeiro", "corte de cabelo masculino", "barba", "são paulo", "centro", "JK", "estilo masculino", "barba clássica"],
+  authors: [{ name: "Barbearia JK" }],
+  creator: "Barbearia JK",
+  publisher: "Barbearia JK",
+  formatDetection: {
+    email: false,
+    address: true,
+    telephone: true,
+  },
+  openGraph: {
+    title: "Barbearia JK — Tradição & Estilo",
+    description: "Cortes clássicos, barba com toalha quente e o melhor do estilo masculino em São Paulo.",
+    url: "https://barbeariaclassica-olive.vercel.app",
+    siteName: "Barbearia JK",
+    locale: "pt_BR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Barbearia JK — Tradição & Estilo",
+    description: "Cortes clássicos e o melhor do estilo masculino em São Paulo.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export const viewport: Viewport = {
@@ -48,6 +86,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${playfair.variable} ${lora.variable} ${cinzel.variable}`}>
+      <head>
+        <JsonLd />
+      </head>
       <body className="bg-primary text-cream antialiased">
         {/* Top Bar */}
         <div className="bg-accent-dark text-primary text-center py-2 px-4 text-[10px] sm:text-[13px] tracking-[1px] sm:tracking-[2px] font-sans font-bold z-50 relative">
