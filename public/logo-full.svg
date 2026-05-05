@@ -1,0 +1,9 @@
+<svg width="240" height="60" viewBox="0 0 240 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circle Logo -->
+  <circle cx="30" cy="30" r="22" stroke="#c9a84c" stroke-width="2"/>
+  <text x="30" y="30" dominant-baseline="central" text-anchor="middle" fill="#c9a84c" font-family="Cinzel, serif" font-weight="900" font-size="20">JK</text>
+  
+  <!-- Text Logo -->
+  <text x="65" y="28" fill="#c9a84c" font-family="Cinzel, serif" font-weight="900" font-size="24" style="text-transform: uppercase; letter-spacing: 4px;">JK</text>
+  <text x="65" y="45" fill="#e2c97e" font-family="Lora, serif" font-style="italic" font-weight="400" font-size="9" style="text-transform: uppercase; letter-spacing: 3px;">Barbearia Clássica</text>
+</svg>
